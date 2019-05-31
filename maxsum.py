@@ -1,16 +1,27 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
+
+"""maxsum module: Provides an implementation of the Maxsum algorithm
+using message passing.
+"""
+
+__version__ = '0.1'
+__author__ = 'Jorge Londoño'
 
 
 import networkx as nx
 import numpy as np
 
-np.seterr(divide='ignore')  # supress divide by zero error
+np.seterr(divide='ignore')  # Supress divide by zero error when taking np.log(0)
 
 
 
 class Maxsum:
-
+    """Maxsum class: Implements the message passing algorithm
+    for computing the maximum of a joint probability distribution.
+    Optionally, when computing the maximum joint probability
+    given some evidence, variables may be fixed to a given state.
+    """
 
     def __init__(self):
         self._g = nx.Graph()    # The graphical model with variable and factor nodes
@@ -18,15 +29,17 @@ class Maxsum:
 
 
     def add_factor(self, name, **kwargs):
+        """Add a factor node to the graphical model"""
         kwargs['factor'] = True
-        kwargs['data'] = {} # messages received indexed by sender
+        kwargs['data'] = {} # Messages received indexed by sender
         kwargs['lnP'] = np.log(kwargs['prob'])
         self._g.add_node(name, **kwargs)
         
         
     def add_variable(self, name, **kwargs):
+        """Add a variable node to the graphical model"""
         kwargs['variable'] = True
-        kwargs['data'] = {} # messages received indexed by sender
+        kwargs['data'] = {} # Messages received indexed by sender
 
         if 'state' in kwargs:
             lnP = -np.inf*np.ones(kwargs['k'])
@@ -39,10 +52,12 @@ class Maxsum:
     
 
     def add_edge(self, src, dst):
+        """Add and edge to the graphical model"""
         self._g.add_edge(src,dst)
 
 
     def _find_roots(self):
+        """Find the roots (terminal nodes) of the graphical model"""
         self._roots = []    
         for n in list(self._g.nodes()):
             if self._g.degree(n)==1:
@@ -52,7 +67,8 @@ class Maxsum:
                 self._g.nodes[n]['isRoot'] = False
 
 
-    def _appendNodeToQueue(self, nodeName):
+    def _append_to_queue(self, nodeName):
+        """Add a mode to the list of nodes pending to visit"""
         if not self._g.nodes[nodeName]['isRoot']:
             if nodeName not in self._toVisit:    
                 if len(self._g.nodes[nodeName]['data']) >= self._g.degree(nodeName)-1:            
@@ -60,22 +76,26 @@ class Maxsum:
 
 
     def _deliver_message(self, toNode, msg):
+        """Deliver a message to a given node"""
         self._g.nodes[toNode]['data'][msg['from']] = msg['data']
-        self._appendNodeToQueue(toNode)
+        self._append_to_queue(toNode)
 
 
-    def _hasnotReceivedMessage(self, toNode, fromNode):
+    def _has_not_received(self, toNode, fromNode):
+        """Check if 'toNode' has already received a message from 'fromNode'"""
         return fromNode not in self._g.nodes[toNode]['data']
 
 
-    def _sumByAxis(self, matrix, vector, axis):
+    def _sum_by_axis(self, matrix, vector, axis):
+        """Add a vector to a given axis of the conditional probability matrix"""
         for k in np.ndindex(matrix.shape):
             matrix[k] += vector[k[axis]]
             #print(f"{k} : {k[axis]} {vector[k[axis]]} ")
         return matrix
 
 
-    def _maxByAxis(self, matrix, axis, neighbors):
+    def _max_by_axis(self, matrix, axis, neighbors):
+        """Compute the maximum of the probability matrix with respect to the 'axis' variable"""
         var = neighbors.pop(axis)
         #print(f"max of {neighbors} with respect to {var}")
         seen = -np.inf * np.ones(matrix.shape[axis])
@@ -88,6 +108,7 @@ class Maxsum:
 
 
     def _consolidate(self):
+        """Compute the maximum probability at the root nodes"""
         # Results
         maxByNode = {}
         for node in self._roots:
@@ -101,7 +122,8 @@ class Maxsum:
         return maxByNode
 
 
-    def _consolidateVariables(self):
+    def _consolidate_variables(self):
+        """Compute the final probabilities of state variables and their state"""
         for node in self._g.nodes:
             if 'variable' in self._g.nodes[node]:
                 sum = self._g.nodes[node]['lnP'].copy()
@@ -113,6 +135,9 @@ class Maxsum:
     
 
     def compute_max(self):
+        """Executes the Maxsum algorithm.
+        Returns the maximum joint probality and the corresponding state
+        """
         self._find_roots()
         self._toVisit = self._roots.copy() 
         while len(self._toVisit)>0:
@@ -124,7 +149,7 @@ class Maxsum:
                 
             # To whom to send messages
             for neighbor in neighbors:
-                if self._hasnotReceivedMessage(neighbor, node):
+                if self._has_not_received(neighbor, node):
                     neighbors.remove(neighbor)
                     # If node has the required data to send a message to neighbor
                     if set(data.keys()).intersection(neighbors)==neighbors:
@@ -136,10 +161,10 @@ class Maxsum:
                             for source in neighbors:
                                 axis = list(self._g.neighbors(node)).index(source)
                                 #print(f"from={source} : axis={axis} - data={data[source]} ")
-                                self._sumByAxis(lnP, data[source], axis)
+                                self._sum_by_axis(lnP, data[source], axis)
                             # Maximize resulting probabilities with respect to target neighbor
                             tAxis = list(self._g.neighbors(node)).index(neighbor)
-                            msgData = self._maxByAxis(lnP, tAxis, list(self._g.neighbors(node)) )
+                            msgData = self._max_by_axis(lnP, tAxis, list(self._g.neighbors(node)) )
                 
                         else:
                             # Variable node
@@ -155,7 +180,7 @@ class Maxsum:
                     neighbors.add(neighbor)
 
         # Results
-        self._consolidateVariables()
+        self._consolidate_variables()
         return self._consolidate()
 
 
