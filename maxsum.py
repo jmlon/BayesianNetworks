@@ -107,30 +107,20 @@ class Maxsum:
         return seen
 
 
-    def _consolidate(self):
-        """Compute the maximum probability at the root nodes"""
-        # Results
-        maxByNode = {}
-        for node in self._roots:
-            #print(f"{node}:  {self._g.nodes[node]['lnP']}")
-            sum = self._g.nodes[node]['lnP']
-            for data in self._g.nodes[node]['data'].values():
-                sum += data
-            maxByNode[node] = np.exp(np.max(sum))
-            maxState = np.argmax(sum)
-            print(f"{node}: sum={sum}, max={maxByNode[node]}, maxState={maxState}")
-        return maxByNode
-
-
     def _consolidate_variables(self):
         """Compute the final probabilities of state variables and their state"""
+        max = {}
+        p_max = None
         for node in self._g.nodes:
             if 'variable' in self._g.nodes[node]:
                 sum = self._g.nodes[node]['lnP'].copy()
                 for source,data in self._g.nodes[node]['data'].items():
                     #print(f"{source} {data}")
                     sum += data
-                print(f"{node} sum = {sum}")
+                max[node] = np.argmax(sum)
+                p_max = np.exp(np.max(sum))
+                #print(f"{node} sum = {sum},  argmax = {np.argmax(sum)},  p_max = {np.exp(np.max(sum))}")
+        return p_max, max
                 
     
 
@@ -180,7 +170,6 @@ class Maxsum:
                     neighbors.add(neighbor)
 
         # Results
-        self._consolidate_variables()
-        return self._consolidate()
+        return self._consolidate_variables()
 
 

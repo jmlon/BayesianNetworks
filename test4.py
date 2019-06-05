@@ -41,5 +41,5 @@ m.add_edge('f124', 'x4')
 m.add_edge('f235', 'x5')
 
 
-maxByNode = m.compute_max()
-print(maxByNode)
+p_max, x_max = m.compute_max()
+print(f"max prob = {p_max},  max state = {x_max}")
