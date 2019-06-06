@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-"""maxsum module: Provides an implementation of the Maxsum algorithm
+"""sumproduct module: Provides an implementation of the Sumproduct algorithm
 using message passing.
 """
 
@@ -16,11 +16,9 @@ np.seterr(divide='ignore')  # Supress divide by zero error when taking np.log(0)
 
 
 
-class Maxsum:
-    """Maxsum class: Implements the message passing algorithm
-    for computing the maximum of a joint probability distribution.
-    Optionally, when computing the maximum joint probability
-    given some evidence, variables may be fixed to a given state.
+class Sumproduct:
+    """Sumproduct class: Implements the message passing algorithm
+    for computing marginals of a joint probability distribution.
     """
 
     def __init__(self):
@@ -32,7 +30,8 @@ class Maxsum:
         """Add a factor node to the graphical model"""
         kwargs['factor'] = True
         kwargs['data'] = {} # Messages received indexed by sender
-        kwargs['lnP'] = np.log(kwargs['prob'])
+        #kwargs['lnP'] = np.log(kwargs['prob'])
+        kwargs['potential'] = kwargs['prob']
         self._g.add_node(name, **kwargs)
         
         
@@ -43,13 +42,17 @@ class Maxsum:
 
         if 'state' in kwargs:
             # Variable corresponds to and observed state
-            lnP = -np.inf*np.ones(kwargs['k'])
-            lnP[kwargs['state']] = 0
+            #lnP = -np.inf*np.ones(kwargs['k'])
+            #lnP[kwargs['state']] = 0
+            pot = np.zeros(kwargs['k'])
+            pot[kwargs['state']] = 1
         else:
             # Unobserved variable
-            lnP = np.zeros(kwargs['k'])        
-        kwargs['lnP'] = lnP
+            #lnP = np.zeros(kwargs['k'])        
+            pot = np.ones(kwargs['k'])
+        kwargs['potential'] = pot
         
+        #print(f"{name} {kwargs}")
         self._g.add_node(name, **kwargs)
     
 
@@ -63,6 +66,7 @@ class Maxsum:
         """Find the roots (terminal nodes) of the graphical model"""
         self._roots = []    
         for n in list(self._g.nodes()):
+            #print(f"{n} {self._g.nodes[n]}")
             if self._g.degree(n)==1:
                 self._g.nodes[n]['isRoot'] = True
                 self._roots.append(n)
@@ -86,49 +90,55 @@ class Maxsum:
 
     def _has_not_received(self, toNode, fromNode):
         """Check if 'toNode' has already received a message from 'fromNode'"""
+        #print(f"{self._g.nodes[toNode]}")
         return fromNode not in self._g.nodes[toNode]['data']
 
 
-    def _sum_by_axis(self, matrix, vector, axis):
-        """Add a vector to a given axis of the conditional probability matrix"""
-        #print(f"{matrix} {vector} {axis}")
+    #def _sum_by_axis(self, matrix, vector, axis):
+    def _product_by_axis(self, matrix, vector, axis):
+        """Multiply a vector to a given axis of the conditional probability matrix"""
+        print(f"Product: {matrix} {vector} {axis}")
         for k in np.ndindex(matrix.shape):
             #print(f"{k} : {k[axis]} {vector[k[axis]]} ")
-            matrix[k] += vector[k[axis]]
+            matrix[k] *= vector[k[axis]]
+        print(f"Product result: {matrix}")
         return matrix
 
 
-    def _max_by_axis(self, matrix, axis, neighbors):
-        """Compute the maximum of the probability matrix with respect to the 'axis' variable"""
+    #def _max_by_axis(self, matrix, axis, neighbors):
+    def _summation_by_axis(self, matrix, axis, neighbors):
+        """Marginalize the probability matrix with respect to the 'axis' variable"""
         var = neighbors.pop(axis)
-        #print(f"max of {neighbors} with respect to {var}")
-        seen = -np.inf * np.ones(matrix.shape[axis])
+        print(f"Summation: {neighbors} with respect to {axis} - {var}")
+        #seen = -np.inf * np.ones(matrix.shape[axis])
+        sum = np.zeros(matrix.shape[axis])
         for k in np.ndindex(matrix.shape):
-            if matrix[k]>seen[k[axis]]:
-                seen[k[axis]]=matrix[k]
-                #coord = list(k)
-                #coord.pop(axis)
-        return seen
+            #if matrix[k]>seen[k[axis]]:
+            sum[k[axis]] += matrix[k]
+            #coord = list(k)
+            #coord.pop(axis)
+        print(f"Summation result: {sum}")
+        return sum
 
 
-    def _consolidate_variables(self):
-        """Compute the final probabilities of state variables and their state"""
-        max = {}
-        p_max = None
+    #def _consolidate_variables(self):
+    def _consolidate_marginals(self):
+        """Compute the marginas for the state variables"""
+        marginals = {}
         for node in self._g.nodes:
             if 'variable' in self._g.nodes[node]:
-                sum = self._g.nodes[node]['lnP'].copy()
+                product = np.ones(self._g.nodes[node]['k'])
                 for source,data in self._g.nodes[node]['data'].items():
                     #print(f"{source} {data}")
-                    sum += data
-                max[node] = np.argmax(sum)
-                p_max = np.exp(np.max(sum))
+                    product *= data
+                marginals[node] = product
                 #print(f"{node} sum = {sum},  argmax = {np.argmax(sum)},  p_max = {np.exp(np.max(sum))}")
-        return p_max, max
+        return marginals
                 
     
 
-    def compute_max(self):
+    #def compute_max(self):
+    def compute_marginals(self):
         """Executes the Maxsum algorithm.
         Returns the maximum joint probality and the corresponding state
         """
@@ -136,7 +146,7 @@ class Maxsum:
         self._toVisit = self._roots.copy() 
         while len(self._toVisit)>0:
             node = self._toVisit.pop(0)
-            #print(f"Visiting {node}")
+            print(f"Visiting {node}")
             data = self._g.nodes[node]['data']
             neighbors = set(self._g.neighbors(node))
             #print(f"neighbors = {neighbors}")
@@ -148,26 +158,27 @@ class Maxsum:
                     # If node has the required data to send a message to neighbor
                     if set(data.keys()).intersection(neighbors)==neighbors:
 
-                        lnP = self._g.nodes[node]['lnP'].copy()
+                        #lnP = self._g.nodes[node]['lnP'].copy()
+                        potential = self._g.nodes[node]['potential'].copy()
                         if 'factor' in self._g.nodes[node]:
                             # Factor node
                             # Compute the message for the neighbor
                             for source in neighbors:
                                 axis = list(self._g.neighbors(node)).index(source)
                                 #print(f"from={source} : axis={axis} - data={data[source]} ")
-                                self._sum_by_axis(lnP, data[source], axis)
+                                self._product_by_axis(potential, data[source], axis)
                             # Maximize resulting probabilities with respect to target neighbor
                             tAxis = list(self._g.neighbors(node)).index(neighbor)
-                            msgData = self._max_by_axis(lnP, tAxis, list(self._g.neighbors(node)) )
+                            msgData = self._summation_by_axis(potential, tAxis, list(self._g.neighbors(node)) )
                 
                         else:
                             # Variable node
-                            msgData = lnP
+                            msgData = potential
                             #print(f"{node} {msgData}")
                             for source,neigborData in data.items():
                                 #print(f"source={source} beighborData={neigborData}")
                                 if neighbor != source:
-                                    msgData += neigborData
+                                    msgData *= neigborData
 
                         msg = {'from':node,'data':msgData}
                         self._deliver_message(neighbor, msg)
@@ -176,6 +187,6 @@ class Maxsum:
                     neighbors.add(neighbor)
 
         # Results
-        return self._consolidate_variables()
+        return self._consolidate_marginals()
 
 
