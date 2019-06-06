@@ -97,11 +97,11 @@ class Sumproduct:
     #def _sum_by_axis(self, matrix, vector, axis):
     def _product_by_axis(self, matrix, vector, axis):
         """Multiply a vector to a given axis of the conditional probability matrix"""
-        print(f"Product: {matrix} {vector} {axis}")
+        #print(f"Product: {matrix} {vector} {axis}")
         for k in np.ndindex(matrix.shape):
             #print(f"{k} : {k[axis]} {vector[k[axis]]} ")
             matrix[k] *= vector[k[axis]]
-        print(f"Product result: {matrix}")
+        #print(f"Product result: {matrix}")
         return matrix
 
 
@@ -109,7 +109,7 @@ class Sumproduct:
     def _summation_by_axis(self, matrix, axis, neighbors):
         """Marginalize the probability matrix with respect to the 'axis' variable"""
         var = neighbors.pop(axis)
-        print(f"Summation: {neighbors} with respect to {axis} - {var}")
+        #print(f"Summation: {neighbors} with respect to {axis} - {var}")
         #seen = -np.inf * np.ones(matrix.shape[axis])
         sum = np.zeros(matrix.shape[axis])
         for k in np.ndindex(matrix.shape):
@@ -117,7 +117,7 @@ class Sumproduct:
             sum[k[axis]] += matrix[k]
             #coord = list(k)
             #coord.pop(axis)
-        print(f"Summation result: {sum}")
+        #print(f"Summation result: {sum}")
         return sum
 
 
@@ -134,7 +134,20 @@ class Sumproduct:
                 marginals[node] = product
                 #print(f"{node} sum = {sum},  argmax = {np.argmax(sum)},  p_max = {np.exp(np.max(sum))}")
         return marginals
-                
+      
+      
+    def _reset(self):
+        """Resets the graph's runtime data"""        
+        for node in self._g.nodes:
+            self._g.nodes[node]['data']={}
+        self._find_roots()
+        self._toVisit = self._roots.copy() 
+    
+    
+    def set_evidence(self, node, state):
+        pot = np.zeros(self._g.nodes[node]['k'])
+        pot[state] = 1
+        self._g.nodes[node]['potential'] = pot
     
 
     #def compute_max(self):
@@ -142,11 +155,10 @@ class Sumproduct:
         """Executes the Maxsum algorithm.
         Returns the maximum joint probality and the corresponding state
         """
-        self._find_roots()
-        self._toVisit = self._roots.copy() 
+        self._reset();
         while len(self._toVisit)>0:
             node = self._toVisit.pop(0)
-            print(f"Visiting {node}")
+            #print(f"Visiting {node}")
             data = self._g.nodes[node]['data']
             neighbors = set(self._g.neighbors(node))
             #print(f"neighbors = {neighbors}")

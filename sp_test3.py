@@ -34,6 +34,18 @@ print(marginals)
 # Direct computation
 joint = np.repeat( (np.repeat(f1,3).reshape((2,3))*f2).flatten(), 4).reshape((6,4)) * f123.reshape((6,4))
 
+# Check the results
 assert np.all( np.isclose(marginals['x3'], sum(joint)) )
 print(f"{marginals['x3']}\n{sum(joint)}\n")
+
+s.set_evidence('x1', state=0)
+marginals = s.compute_marginals()
+print(marginals)
+assert np.all( np.isclose(marginals['x3'], sum(joint[:3,:])) )
+
+s.set_evidence('x1', state=1)
+marginals = s.compute_marginals()
+print(marginals)
+assert np.all( np.isclose(marginals['x3'], sum(joint[3:,:])) )
+
 

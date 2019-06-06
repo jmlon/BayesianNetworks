@@ -125,15 +125,27 @@ class Maxsum:
                 p_max = np.exp(np.max(sum))
                 #print(f"{node} sum = {sum},  argmax = {np.argmax(sum)},  p_max = {np.exp(np.max(sum))}")
         return p_max, max
-                
+
+
+    def _reset(self):
+        """Resets the graph's runtime data"""        
+        for node in self._g.nodes:
+            self._g.nodes[node]['data']={}
+        self._find_roots()
+        self._toVisit = self._roots.copy() 
+    
+    
+    def set_evidence(self, node, state):
+        lnP = -np.inf*np.ones(self._g.nodes[node]['k'])
+        lnP[state] = 0
+        self._g.nodes[node]['lnP'] = lnP
     
 
     def compute_max(self):
         """Executes the Maxsum algorithm.
         Returns the maximum joint probality and the corresponding state
         """
-        self._find_roots()
-        self._toVisit = self._roots.copy() 
+        self._reset()
         while len(self._toVisit)>0:
             node = self._toVisit.pop(0)
             #print(f"Visiting {node}")

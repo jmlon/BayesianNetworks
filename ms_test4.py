@@ -27,8 +27,10 @@ m.add_factor('f235', prob=f235)
 m.add_variable('x1', k=2)
 m.add_variable('x2', k=2)
 m.add_variable('x3', k=2)
-m.add_variable('x4', k=2, state=1) # Fix the given state (evidence)
-m.add_variable('x5', k=2, state=0) # Fix the given state (evidence)
+m.add_variable('x4', k=2)
+m.add_variable('x5', k=2)
+#m.add_variable('x4', k=2, state=1) # Fix the given state (evidence)
+#m.add_variable('x5', k=2, state=0) # Fix the given state (evidence)
 
 m.add_edge('f1', 'x1')
 m.add_edge('f2', 'x2')
@@ -42,4 +44,19 @@ m.add_edge('f235', 'x5')
 
 
 p_max, x_max = m.compute_max()
+print("No evidence")
 print(f"max prob = {p_max},  max state = {x_max}")
+
+m.set_evidence('x4', 1)
+m.set_evidence('x5', 1)
+p_max, x_max = m.compute_max()
+print("With evidence x4=1,x5=1")
+print(f"max prob = {p_max},  max state = {x_max}")
+
+m.set_evidence('x4', 0)
+m.set_evidence('x5', 1)
+p_max, x_max = m.compute_max()
+print("With evidence x4=0,x5=1")
+print(f"max prob = {p_max},  max state = {x_max}")
+
+
